@@ -1,0 +1,153 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Send, Mic, User, Bot, Sparkles } from 'lucide-react';
+import { cn } from '@/src/lib/utils';
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: Date;
+}
+
+interface ChatbotPageProps {
+  title: string;
+  subtitle: string;
+  examplePrompts: string[];
+  placeholder: string;
+}
+
+export function ChatbotPage({ title, subtitle, examplePrompts, placeholder }: ChatbotPageProps) {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      text: `Namaste! I am your PreventX ${title}. How can I help you today?`,
+      sender: 'bot',
+      timestamp: new Date(),
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+
+  const handleSend = (text: string) => {
+    if (!text.trim()) return;
+
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      text,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsTyping(true);
+
+    // Simulate bot response
+    setTimeout(() => {
+      const botMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `I've analyzed your request about "${text}". Based on our AI models, I recommend following a balanced diet and consulting a local PHC worker for a detailed checkup. Would you like me to provide a specific plan?`,
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botMsg]);
+      setIsTyping(false);
+    }, 1500);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <header className="bg-white px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-slate-900">{title}</h1>
+          <p className="text-sm text-slate-500">{subtitle}</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 rounded-xl text-xs font-bold uppercase tracking-wider">
+          <Sparkles className="w-4 h-4" />
+          AI Powered
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <AnimatePresence initial={false}>
+          {messages.map((msg) => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className={cn(
+                "flex items-start gap-4 max-w-2xl",
+                msg.sender === 'user' ? "ml-auto flex-row-reverse" : ""
+              )}
+            >
+              <div className={cn(
+                "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
+                msg.sender === 'bot' ? "medical-gradient text-white" : "bg-white text-slate-600"
+              )}>
+                {msg.sender === 'bot' ? <Bot className="w-6 h-6" /> : <User className="w-6 h-6" />}
+              </div>
+              <div className={cn(
+                "p-5 rounded-3xl text-sm leading-relaxed shadow-sm",
+                msg.sender === 'bot' 
+                  ? "bg-white text-slate-700 rounded-tl-none" 
+                  : "bg-teal-600 text-white rounded-tr-none"
+              )}>
+                {msg.text}
+                <p className={cn(
+                  "text-[10px] mt-2 font-bold uppercase tracking-widest opacity-50",
+                  msg.sender === 'user' ? "text-right" : ""
+                )}>
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        {isTyping && (
+          <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+            <Bot className="w-4 h-4" />
+            AI is thinking...
+          </div>
+        )}
+      </div>
+
+      <div className="p-8 bg-white border-t border-slate-100">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex flex-wrap gap-2 mb-6">
+            {examplePrompts.map((prompt, i) => (
+              <button
+                key={i}
+                onClick={() => handleSend(prompt)}
+                className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-xs font-bold border border-slate-100 hover:bg-teal-50 hover:text-teal-600 hover:border-teal-100 transition-all"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSend(input)}
+              placeholder={placeholder}
+              className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] py-5 pl-8 pr-32 focus:outline-none focus:border-teal-500 transition-colors text-slate-700 font-medium"
+            />
+            <div className="absolute right-3 top-3 flex items-center gap-2">
+              <button className="w-12 h-12 bg-white text-slate-400 rounded-2xl flex items-center justify-center hover:text-teal-600 transition-colors shadow-sm">
+                <Mic className="w-6 h-6" />
+              </button>
+              <button 
+                onClick={() => handleSend(input)}
+                className="w-12 h-12 medical-gradient text-white rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/20 hover:scale-105 transition-transform"
+              >
+                <Send className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
