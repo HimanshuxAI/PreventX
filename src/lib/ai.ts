@@ -5,7 +5,7 @@ import { PredictionResults } from './mlEngine';
  * Uses native fetch through Vite proxy to bypass CORS.
  */
 
-const NVIDIA_API_KEY = "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";
+const NVIDIA_API_KEY = import.meta.env.VITE_NVIDIA_API_KEY;
 
 const SYSTEM_PROMPT = `You are "AarogyaShield AI", a professional medical health coach built for the PreventX platform.
 Your goal is to provide personalized, non-invasive health guidance to users in rural and urban India.
@@ -32,6 +32,12 @@ export async function* streamChat(
   messages: ChatMessage[],
   latestResults?: PredictionResults | null
 ) {
+  if (!NVIDIA_API_KEY) {
+    console.error('Missing VITE_NVIDIA_API_KEY. Add it to .env.local.');
+    yield "AI chat is not configured yet. Please set VITE_NVIDIA_API_KEY in your environment.";
+    return;
+  }
+
   const contextMessages: ChatMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     ...(latestResults ? [{

@@ -361,15 +361,16 @@ Create `.env.local` in project root (recommended):
 ```bash
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_NVIDIA_API_KEY=your_nvidia_api_key
 GEMINI_API_KEY=optional_legacy_value
 DISABLE_HMR=false
 ```
 
 Notes:
 
-- `GEMINI_API_KEY` is currently legacy/template related and not the active chat path.
-- Current AI adapter uses an in-source NVIDIA key constant in `src/lib/ai.ts`.
-- Current Supabase client includes fallback in-source URL/key in `src/lib/supabase.ts`.
+- `VITE_NVIDIA_API_KEY` is required for chat streaming requests.
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required for auth/cloud sync.
+- `GEMINI_API_KEY` is legacy/template related and not the active chat path.
 
 For production, move all keys/secrets out of source code and into secure environment management.
 
