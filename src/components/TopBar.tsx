@@ -4,11 +4,12 @@ import { Language, translations } from '../types';
 
 interface TopBarProps {
   language: Language;
+  userEmail?: string;
   onLanguageChange: (lang: Language) => void;
   onLogout: () => void;
 }
 
-export function TopBar({ language, onLanguageChange, onLogout }: TopBarProps) {
+export function TopBar({ language, userEmail, onLanguageChange, onLogout }: TopBarProps) {
   const t = translations[language];
 
   return (
@@ -34,22 +35,20 @@ export function TopBar({ language, onLanguageChange, onLogout }: TopBarProps) {
         
         <div className="flex items-center gap-3 pl-4 border-l border-slate-100 relative group">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-900">Priya Deshmukh</p>
+             {/* Formatting email nicely by removing domain if they want a clean name, or just presenting email */}
+            <p className="text-sm font-bold text-slate-900 truncate max-w-[120px]">
+              {userEmail ? userEmail.split('@')[0] : 'User'}
+            </p>
           </div>
-          <button className="w-10 h-10 rounded-xl overflow-hidden shadow-md border-2 border-white hover:border-teal-500 transition-all">
-            <img 
-              src="https://i.pinimg.com/736x/4e/08/04/4e080473ea8eed8e691a0d0cb4797c5f.jpg" 
-              alt="User Profile" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+          <button className="w-10 h-10 rounded-xl overflow-hidden bg-slate-200 shadow-md border-2 border-white hover:border-teal-500 transition-all flex justify-center items-center">
+             <span className="font-display font-bold text-slate-500 text-lg uppercase">{userEmail ? userEmail.charAt(0) : 'U'}</span>
           </button>
 
           {/* Logout Dropdown */}
           <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden">
             <div className="p-4 border-b border-slate-50 bg-slate-50/50">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Account</p>
-              <p className="text-sm font-bold text-slate-900 truncate">Priya Deshmukh</p>
+              <p className="text-sm font-bold text-slate-900 truncate">{userEmail || 'User'}</p>
             </div>
             <button 
               onClick={onLogout}

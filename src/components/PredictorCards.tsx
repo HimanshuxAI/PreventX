@@ -24,11 +24,50 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Language, translations } from '../types';
+import { runPrediction, type FormDataInput, type PredictionResults } from '../lib/mlEngine';
+import { ResultsDashboard } from './ResultsDashboard';
 
 interface PredictorProps {
   onClose: () => void;
   language: Language;
   initialDisease?: string;
+}
+
+interface RadioCardProps {
+  key?: string;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  description?: string;
+  isMissing?: boolean;
+}
+
+function RadioCard({ label, selected, onClick, description, isMissing }: RadioCardProps) {
+  return (
+  <button 
+    onClick={onClick}
+    className={cn(
+      "w-full p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 group mb-2 text-wrap",
+      selected 
+        ? "border-amber-400 bg-amber-50/50" 
+        : cn(
+            "border-slate-100 bg-white hover:border-slate-200",
+            isMissing && "border-rose-500 bg-rose-50/30"
+          )
+    )}
+  >
+    <div className={cn(
+      "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+      selected ? "border-amber-500 bg-white" : "border-slate-200 group-hover:border-slate-300"
+    )}>
+      {selected && <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />}
+    </div>
+    <div>
+      <p className={cn("text-sm font-bold transition-colors", selected ? "text-amber-900" : "text-slate-700 group-hover:text-slate-900")}>{label}</p>
+      {description && <p className="text-[10px] text-slate-500 mt-0.5">{description}</p>}
+    </div>
+  </button>
+  );
 }
 
 export function DiseasePredictor({ onClose, language, initialDisease }: PredictorProps) {
@@ -85,7 +124,7 @@ export function DiseasePredictor({ onClose, language, initialDisease }: Predicto
     homeBP: ''
   });
 
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<PredictionResults | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
@@ -147,56 +186,44 @@ export function DiseasePredictor({ onClose, language, initialDisease }: Predicto
 
   const calculateRisk = () => {
     setIsCalculating(true);
-    // Simulate complex model calculation
+    // Simulate ML model processing time (ensemble inference)
     setTimeout(() => {
-      const diabetesRisk = Math.min(95, Math.max(5, 
-        (formData.parentsDiabetes === 'Both parents' ? 40 : formData.parentsDiabetes === 'One parent' ? 20 : 0) +
-        (parseFloat(bmi || '0') > 25 ? 20 : 0) +
-        (formData.waist > 90 ? 15 : 0) +
-        (formData.sugaryFoods === 'Daily' ? 15 : 0) +
-        (formData.activity === 'Sedentary' ? 10 : 0) +
-        (formData.weightChange === 'Weight Gain' ? 10 : 0) +
-        (parseInt(formData.sittingHours) > 8 ? 10 : 0)
-      ));
-
-      const hypertensionRisk = Math.min(95, Math.max(5,
-        (formData.relativesBP === 'Yes' ? 25 : 0) +
-        (formData.saltyFoods === 'Daily' ? 20 : 0) +
-        (formData.smoke === 'Currently' ? 15 : 0) +
-        (formData.stress === 'High' ? 15 : 0) +
-        (parseFloat(bmi || '0') > 27 ? 15 : 0) +
-        (formData.homeBP && parseInt(formData.homeBP.split('/')[0]) > 140 ? 20 : 0)
-      ));
-
-      const anemiaRisk = Math.min(95, Math.max(5,
-        (formData.familyAnemia === 'Yes' ? 20 : 0) +
-        (formData.ironRichFoods === 'Rarely' ? 30 : 0) +
-        (formData.gender === 'Female' && formData.heavyBleeding.includes('heavy') ? 25 : 0) +
-        (formData.symptoms.includes('Fatigue or weakness') ? 15 : 0) -
-        (formData.fingernailPhoto ? 10 : 0) // Camera check reduces uncertainty
-      ));
-
-      setResults({
-        diabetes: diabetesRisk,
-        hypertension: hypertensionRisk,
-        anemia: anemiaRisk,
-        reasons: [
-          formData.waist > 90 ? "High waist circumference" : null,
-          formData.activity === 'Sedentary' ? "Low physical activity" : null,
-          formData.parentsDiabetes !== 'No' ? "Family history" : null,
-          formData.ironRichFoods === 'Rarely' ? "Low iron intake" : null,
-          formData.weightChange === 'Weight Gain' ? "Recent weight gain" : null,
-          formData.fingernailPhoto ? "AI Image Analysis (High Confidence)" : null
-        ].filter(Boolean),
-        suggestions: [
-          "Walk 30 mins daily",
-          "Reduce sugar intake",
-          "Get blood test done",
-          "Increase leafy green consumption"
-        ]
-      });
+      // Map form data to ML engine format
+      const heightCm = ((parseInt(formData.heightFeet) || 5) * 12 + (parseInt(formData.heightInches) || 0)) * 2.54;
+      const mlInput: FormDataInput = {
+        age: formData.age || '30',
+        gender: formData.gender || 'Male',
+        height: String(Math.round(heightCm)),
+        weight: formData.weight || '70',
+        familyDiabetes: formData.parentsDiabetes === 'Both parents' ? 'Yes' : formData.parentsDiabetes === 'One parent' ? 'Yes' : 'No',
+        familyHypertension: formData.relativesBP || 'No',
+        familyAnemia: formData.familyAnemia || 'No',
+        exerciseFrequency: formData.activity === 'Sedentary' ? 'Never' : formData.activity === 'Moderate' ? '2-3 times a week' : formData.activity === 'Active' ? 'Daily' : 'Rarely',
+        diet: formData.dietType || 'Mixed',
+        sleep: formData.sleep === 'Under 5 hours' ? 'Less than 5 hours' : formData.sleep === '5-6 hours' ? '5\u20136 hours' : '7\u20138 hours (recommended)',
+        alcohol: formData.alcohol === 'Frequently' ? 'Frequently' : formData.alcohol === 'Occasionally' ? 'Occasionally' : 'Never',
+        smoking: formData.smoke === 'Currently' ? 'Yes, regularly' : formData.smoke === 'Ex-smoker' ? 'Occasionally' : 'Never',
+        stressLevel: formData.stress || 'Moderate',
+        saltIntake: formData.saltyFoods === 'Daily' ? 'High' : formData.saltyFoods === 'Weekly' ? 'Moderate' : 'Low',
+        sugarIntake: formData.sugaryFoods === 'Daily' ? 'Daily' : formData.sugaryFoods === 'Weekly' ? 'Weekly' : 'Rarely (natural only)',
+        waterIntake: 'Moderate',
+        fattyFood: 'Moderate',
+        junkFood: 'Moderate',
+        existingConditions: formData.existingConditions || [],
+        symptoms: formData.symptoms || [],
+        diagSugar: formData.diagSugar || 'No',
+        gestationalDiabetes: formData.gestationalDiabetes || 'No',
+        heavyBleeding: formData.heavyBleeding || '',
+        periodDuration: formData.periodDuration || '',
+        homeBP: formData.homeBP || '',
+        fingernailPhoto: formData.fingernailPhoto,
+        eyelidPhoto: formData.eyelidPhoto,
+        otherCondition: formData.otherCondition || '',
+      };
+      const predictionResults = runPrediction(mlInput);
+      setResults(predictionResults);
       setIsCalculating(false);
-    }, 2000);
+    }, 2500);
   };
 
   const isMissing = (field: string) => {
@@ -205,32 +232,6 @@ export function DiseasePredictor({ onClose, language, initialDisease }: Predicto
     if (Array.isArray(value)) return value.length === 0;
     return !value;
   };
-
-  const RadioCard = ({ label, selected, onClick, description, field }: { label: string, selected: boolean, onClick: () => void, description?: string, field?: string }) => (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "w-full p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 group mb-2",
-        selected 
-          ? "border-amber-400 bg-amber-50/50" 
-          : cn(
-              "border-slate-100 bg-white hover:border-slate-200",
-              field && isMissing(field) && "border-rose-500 bg-rose-50/30"
-            )
-      )}
-    >
-      <div className={cn(
-        "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-        selected ? "border-blue-600 bg-white" : "border-slate-300 bg-white"
-      )}>
-        {selected && <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
-      </div>
-      <div>
-        <p className={cn("font-bold text-sm", selected ? "text-amber-900" : "text-slate-700")}>{label}</p>
-        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
-      </div>
-    </button>
-  );
 
   const StepHeader = ({ icon: Icon, title, badge }: { icon: any, title: string, badge?: string }) => (
     <div className="flex items-center gap-3 mb-6">
@@ -487,7 +488,7 @@ export function DiseasePredictor({ onClose, language, initialDisease }: Predicto
                         setFormData({...formData, activity: opt});
                         if (showValidationErrors) setShowValidationErrors(false);
                       }}
-                      field="activity"
+                      isMissing={isMissing('activity')}
                     />
                   ))}
                 </div>
@@ -1122,133 +1123,49 @@ export function DiseasePredictor({ onClose, language, initialDisease }: Predicto
     }
   };
 
+  // Build ML input for the ResultsDashboard's What-If simulator
+  const buildMlInput = (): FormDataInput => {
+    const heightCm = ((parseInt(formData.heightFeet) || 5) * 12 + (parseInt(formData.heightInches) || 0)) * 2.54;
+    return {
+      age: formData.age || '30',
+      gender: formData.gender || 'Male',
+      height: String(Math.round(heightCm)),
+      weight: formData.weight || '70',
+      familyDiabetes: formData.parentsDiabetes === 'Both parents' ? 'Yes' : formData.parentsDiabetes === 'One parent' ? 'Yes' : 'No',
+      familyHypertension: formData.relativesBP || 'No',
+      familyAnemia: formData.familyAnemia || 'No',
+      exerciseFrequency: formData.activity === 'Sedentary' ? 'Never' : formData.activity === 'Moderate' ? '2-3 times a week' : formData.activity === 'Active' ? 'Daily' : 'Rarely',
+      diet: formData.dietType || 'Mixed',
+      sleep: formData.sleep === 'Under 5 hours' ? 'Less than 5 hours' : '7\u20138 hours (recommended)',
+      alcohol: formData.alcohol === 'Frequently' ? 'Frequently' : formData.alcohol === 'Occasionally' ? 'Occasionally' : 'Never',
+      smoking: formData.smoke === 'Currently' ? 'Yes, regularly' : formData.smoke === 'Ex-smoker' ? 'Occasionally' : 'Never',
+      stressLevel: formData.stress || 'Moderate',
+      saltIntake: formData.saltyFoods === 'Daily' ? 'High' : formData.saltyFoods === 'Weekly' ? 'Moderate' : 'Low',
+      sugarIntake: formData.sugaryFoods === 'Daily' ? 'Daily' : formData.sugaryFoods === 'Weekly' ? 'Weekly' : 'Rarely (natural only)',
+      waterIntake: 'Moderate',
+      fattyFood: 'Moderate',
+      junkFood: 'Moderate',
+      existingConditions: formData.existingConditions || [],
+      symptoms: formData.symptoms || [],
+      diagSugar: formData.diagSugar || 'No',
+      gestationalDiabetes: formData.gestationalDiabetes || 'No',
+      heavyBleeding: formData.heavyBleeding || '',
+      periodDuration: formData.periodDuration || '',
+      homeBP: formData.homeBP || '',
+      fingernailPhoto: formData.fingernailPhoto,
+      eyelidPhoto: formData.eyelidPhoto,
+      otherCondition: formData.otherCondition || '',
+    };
+  };
+
   if (results) {
     return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm"
-      >
-        <div className="bg-white rounded-[40px] w-full max-w-4xl max-h-[90vh] overflow-y-auto soft-shadow border border-slate-100 relative p-10">
-          <button 
-            onClick={onClose}
-            className="absolute right-6 top-6 w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all z-10"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          <div className="text-center mb-10">
-            <div className="w-20 h-20 medical-gradient rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-teal-500/20">
-              <FileText className="text-white w-10 h-10" />
-            </div>
-            <h2 className="text-3xl font-display font-bold text-slate-900 mb-2">🧾 Results Screen</h2>
-            <p className="text-slate-500 font-medium italic">AI-Powered Health Risk Assessment</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            {[
-              { label: 'Diabetes Risk', value: results.diabetes, color: 'rose' },
-              { label: 'Hypertension Risk', value: results.hypertension, color: 'teal' },
-              { label: 'Anemia Risk', value: results.anemia, color: 'blue' }
-            ].map((risk, i) => (
-              <div key={i} className="p-6 bg-slate-50/50 rounded-[32px] border border-slate-100 text-center">
-                <p className={cn("text-xs font-bold uppercase tracking-widest mb-2", `text-${risk.color}-600`)}>{risk.label}</p>
-                <div className="flex items-baseline justify-center gap-1 mb-4">
-                  <span className={cn("text-4xl font-display font-bold", `text-${risk.color}-600`)}>{risk.value}%</span>
-                  <span className={cn("text-sm font-bold", `text-${risk.color}-500`)}>
-                    ({risk.value > 70 ? 'High' : risk.value > 40 ? 'Moderate' : 'Low'})
-                  </span>
-                </div>
-                
-                {/* Severity Bar */}
-                <div className="space-y-1.5">
-                  <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden flex p-0.5">
-                    <div 
-                      className={cn(
-                        "h-full rounded-l-full transition-all duration-1000",
-                        risk.value <= 40 ? `bg-${risk.color}-500 shadow-[0_0_8px_rgba(0,0,0,0.1)]` : "bg-slate-200"
-                      )} 
-                      style={{ width: '33.33%' }} 
-                    />
-                    <div 
-                      className={cn(
-                        "h-full transition-all duration-1000 mx-0.5",
-                        risk.value > 40 && risk.value <= 70 ? `bg-${risk.color}-500 shadow-[0_0_8px_rgba(0,0,0,0.1)]` : "bg-slate-200"
-                      )} 
-                      style={{ width: '33.33%' }} 
-                    />
-                    <div 
-                      className={cn(
-                        "h-full rounded-r-full transition-all duration-1000",
-                        risk.value > 70 ? `bg-${risk.color}-500 shadow-[0_0_8px_rgba(0,0,0,0.1)]` : "bg-slate-200"
-                      )} 
-                      style={{ width: '33.33%' }} 
-                    />
-                  </div>
-                  <div className="flex justify-between text-[9px] font-black uppercase tracking-wider text-slate-400 px-1">
-                    <span className={risk.value <= 40 ? `text-${risk.color}-600` : ""}>Low</span>
-                    <span className={risk.value > 40 && risk.value <= 70 ? `text-${risk.color}-600` : ""}>Moderate</span>
-                    <span className={risk.value > 70 ? `text-${risk.color}-600` : ""}>High</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <TrendingUp className="text-teal-600 w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-900">📊 Explainability (SHAP-based)</h3>
-              </div>
-              <p className="text-slate-600 font-medium">“Your risk is high because of:”</p>
-              <div className="space-y-3">
-                {results.reasons.map((reason: string, i: number) => (
-                  <div key={i} className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div className="w-2 h-2 bg-rose-500 rounded-full" />
-                    <span className="font-bold text-slate-700">{reason}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="text-emerald-600 w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-900">🟢 Personalized Suggestions</h3>
-              </div>
-              <div className="space-y-3">
-                {results.suggestions.map((sug: string, i: number) => (
-                  <div key={i} className="flex items-center gap-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                    <ArrowRight className="text-emerald-600 w-5 h-5" />
-                    <span className="font-bold text-emerald-700">{sug}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-4 mt-10">
-            <button 
-              onClick={() => {
-                const text = `My Health Risk Assessment Results:\nDiabetes: ${results.diabetes}%\nHypertension: ${results.hypertension}%\nAnemia: ${results.anemia}%`;
-                navigator.clipboard.writeText(text);
-                alert('Results copied to clipboard!');
-              }}
-              className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
-            >
-              <Share2 className="w-5 h-5" />
-              Share Result
-            </button>
-            <button 
-              onClick={onClose}
-              className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 transition-all"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </motion.div>
+      <ResultsDashboard
+        results={results}
+        formData={buildMlInput()}
+        onClose={onClose}
+        language={language}
+      />
     );
   }
 

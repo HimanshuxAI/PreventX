@@ -14,17 +14,37 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLogin) {
-      if ((email === 'Priya@deshmukh' || email === 'infinitymagnum302@gmail.com') && password === 'OKPREVENT') {
-        onLogin();
+    setError('');
+    setLoading(true);
+    
+    try {
+      const { signIn, signUp } = await import('../lib/supabase');
+      
+      if (isLogin) {
+        const { error } = await signIn(email, password);
+        if (error) {
+          setError(error.message);
+        } else {
+          localStorage.removeItem('preventx_reports');
+          onLogin();
+        }
       } else {
-        setError('Invalid email or password');
+        const { error } = await signUp(email, password);
+        if (error) {
+          setError(error.message);
+        } else {
+          localStorage.removeItem('preventx_reports');
+          onLogin();
+        }
       }
-    } else {
-      // Mock sign up
-      onLogin();
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -150,10 +170,11 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
             <button 
               type="submit"
-              className="w-full py-3.5 medical-gradient text-white rounded-xl font-bold shadow-lg shadow-teal-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-sm"
+              disabled={loading}
+              className="w-full py-3.5 medical-gradient text-white rounded-xl font-bold shadow-lg shadow-teal-500/30 flex items-center justify-center gap-2 text-sm disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              {isLogin ? 'Login' : 'Create Account'}
-              <ArrowRight className="w-4 h-4" />
+              {loading ? 'Processing...' : (isLogin ? 'Login' : 'Create Account')}
+              {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
 
             <div className="relative py-3">

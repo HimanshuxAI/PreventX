@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Mic, User, Bot, Sparkles } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { cn } from '../lib/utils';
+import { streamChat, ChatMessage } from '../lib/ai';
+import { getReports, PredictionResults } from '../lib/mlEngine';
 
 interface Message {
   id: string;
@@ -28,9 +30,22 @@ export function ChatbotPage({ title, subtitle, examplePrompts, placeholder }: Ch
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [latestReport, setLatestReport] = useState<PredictionResults | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
+  useEffect(() => {
+    const reports = getReports();
+    if (reports.length > 0) {
+      setLatestReport(reports[0]);
+    }
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
+
+  const handleSend = async (text: string) => {
+    if (!text.trim() || isTyping) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -43,17 +58,37 @@ export function ChatbotPage({ title, subtitle, examplePrompts, placeholder }: Ch
     setInput('');
     setIsTyping(true);
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        text: `I've analyzed your request about "${text}". Based on our AI models, I recommend following a balanced diet and consulting a local PHC worker for a detailed checkup. Would you like me to provide a specific plan?`,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, botMsg]);
+    // Prepare history for AI (last 10 messages)
+    const history: ChatMessage[] = messages.slice(-10).map(m => ({
+      role: m.sender === 'bot' ? 'assistant' : 'user',
+      content: m.text
+    }));
+    history.push({ role: 'user', content: text });
+
+    // Create placeholder for bot response
+    const botMsgId = (Date.now() + 1).toString();
+    const botMsg: Message = {
+      id: botMsgId,
+      text: '',
+      sender: 'bot',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, botMsg]);
+
+    try {
+      let fullText = '';
+      for await (const chunk of streamChat(history, latestReport)) {
+        fullText += chunk;
+        setMessages(prev => prev.map(m => 
+          m.id === botMsgId ? { ...m, text: fullText } : m
+        ));
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -104,6 +139,7 @@ export function ChatbotPage({ title, subtitle, examplePrompts, placeholder }: Ch
             </motion.div>
           ))}
         </AnimatePresence>
+        <div ref={messagesEndRef} />
         {isTyping && (
           <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-widest animate-pulse">
             <Bot className="w-4 h-4" />

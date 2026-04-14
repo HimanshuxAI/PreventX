@@ -8,7 +8,8 @@ import {
   LineChart, 
   Globe2, 
   Settings,
-  Heart
+  Heart,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Page, Language, translations } from '../types';
@@ -28,6 +29,7 @@ export function Sidebar({ currentPage, onPageChange, language }: SidebarProps) {
     { id: 'chatbot', icon: MessageSquare, label: t.chatbot },
     { id: 'precautions', icon: ShieldCheck, label: t.precautions },
     { id: 'impact', icon: Globe2, label: t.impact },
+    { id: 'reports', icon: FileText, label: language === 'en' ? 'My Reports' : language === 'hi' ? 'मेरी रिपोर्ट्स' : 'माझ्या अहवाल' },
     { id: 'settings', icon: Settings, label: t.settings },
   ];
 

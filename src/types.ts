@@ -4,6 +4,7 @@ export type Page =
   | 'chatbot' 
   | 'precautions' 
   | 'impact' 
+  | 'reports'
   | 'settings'
   | 'login';
 
