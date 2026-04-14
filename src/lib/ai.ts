@@ -2,10 +2,8 @@ import { PredictionResults } from './mlEngine';
 
 /**
  * PreventX AI Service (Minimax AI via NVIDIA NIM)
- * Uses native fetch through Vite proxy to bypass CORS.
+ * Calls a same-origin backend proxy endpoint.
  */
-
-const NVIDIA_API_KEY = "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";
 
 const SYSTEM_PROMPT = `You are "AarogyaShield AI", a professional medical health coach built for the PreventX platform.
 Your goal is to provide personalized, non-invasive health guidance to users in rural and urban India.
@@ -46,12 +44,11 @@ export async function* streamChat(
   ];
 
   try {
-    // Use Vite dev proxy: /api/nvidia → https://integrate.api.nvidia.com/v1
+    // In development, Vite proxies this route. In production, Express handles it.
     const response = await fetch('/api/nvidia/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${NVIDIA_API_KEY}`,
       },
       body: JSON.stringify({
         model: "minimaxai/minimax-m2.7",

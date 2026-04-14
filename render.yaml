@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: preventx
+    runtime: node
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /healthz
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

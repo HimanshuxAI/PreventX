@@ -1,14 +1,11 @@
 // Service Worker for PreventX - AI Health Companion
-const CACHE_NAME = 'preventx-cache-v1';
+const CACHE_NAME = 'preventx-cache-v2';
 const OFFLINE_URL = '/index.html';
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
   '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css'
+  '/index.html'
 ];
 
 self.addEventListener('install', (event) => {
@@ -34,28 +31,39 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // FIX: If it's a cross-origin request (like Google Fonts or APIs), 
-  // just let the browser handle it normally instead of returning 'nothing'.
-  if (!event.request.url.startsWith(self.location.origin)) {
-    return; // The browser will take over here automatically.
+  const requestUrl = new URL(event.request.url);
+
+  // Never intercept non-GET requests (auth, API calls, uploads, etc.).
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Ignore cross-origin requests.
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
+  // Avoid caching API responses.
+  if (requestUrl.pathname.startsWith('/api/')) {
+    return;
   }
 
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Only cache valid, same-origin responses
+    fetch(event.request, { cache: 'no-store' })
+      .then(response => {
         if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          const isStaticAsset = requestUrl.pathname.startsWith('/assets/') || requestUrl.pathname.endsWith('.css') || requestUrl.pathname.endsWith('.js');
+          if (isStaticAsset) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
+          }
         }
         return response;
-      })
-      .catch(() => {
-        // Fallback to cache if network fails
-        return caches.match(event.request).then((cachedResponse) => {
-          return cachedResponse || caches.match(OFFLINE_URL);
+      }).catch(() => {
+        return caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) return cachedResponse;
+          if (event.request.mode === 'navigate') return caches.match(OFFLINE_URL);
+          return Response.error();
         });
       })
   );
