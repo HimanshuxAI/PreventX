@@ -8,6 +8,7 @@ export default defineConfig(({mode}) => {
   const nvidiaApiKey = env.NVIDIA_API_KEY;
 
   return {
+    envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
