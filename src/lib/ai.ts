@@ -4,7 +4,6 @@ import { PredictionResults } from './mlEngine';
  * PreventX AI Service (Minimax AI via NVIDIA NIM)
  * Calls a same-origin backend proxy endpoint.
  */
-
 const SYSTEM_PROMPT = `You are "AarogyaShield AI", a professional medical health coach built for the PreventX platform.
 Your goal is to provide personalized, non-invasive health guidance to users in rural and urban India.
 

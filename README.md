@@ -1,47 +1,58 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 # PreventX
 
-This project is a Vite + React application with a small Express server for production hosting and secure AI proxying.
+PreventX is a Vite + React + TypeScript health screening app with AI chat guidance and optional Supabase-backed user data sync.
 
-## Run Locally
+It focuses on early risk screening for:
+- Diabetes
+- Hypertension
+- Anemia
 
-Prerequisites: Node.js 20+
+This is a risk-screening tool, not a medical diagnosis system.
+
+## Quick Start
+
+Prerequisite: Node.js 20+
 
 1. Install dependencies:
-   `npm install`
-2. Create `.env.local` using `.env.example`.
+   npm install
+2. Create .env.local from .env.example
 3. Set required variables:
-   - `NVIDIA_API_KEY=your_nvidia_key`
-   - `VITE_SUPABASE_URL=https://your-project.supabase.co`
-   - `VITE_SUPABASE_ANON_KEY=your_public_anon_key`
-4. Start the app in development mode:
-   `npm run dev`
+   - NVIDIA_API_KEY
+   - VITE_SUPABASE_URL
+   - VITE_SUPABASE_ANON_KEY
+4. Start development server:
+   npm run dev
 
 ## Production (Render)
 
-This repository includes `render.yaml` so you can deploy with a Render Blueprint.
+This repository includes render.yaml for Render Blueprint deployment.
 
 1. Push this repo to GitHub.
-2. In Render, click **New +** → **Blueprint**.
-3. Select your repo and confirm the detected service.
+2. In Render, create a new Blueprint service.
+3. Select this repo.
 4. Set environment variables in Render:
-   - `NVIDIA_API_KEY` (required)
-   - `VITE_SUPABASE_URL` (required)
-   - `VITE_SUPABASE_ANON_KEY` (required)
+   - NVIDIA_API_KEY (required)
+   - VITE_SUPABASE_URL (required)
+   - VITE_SUPABASE_ANON_KEY (required)
 5. Deploy.
 
-Render build/start used by this repo:
+Build command:
+- npm ci && npm run build
 
-- Build command: `npm ci && npm run build`
-- Start command: `npm run start`
+Start command:
+- npm run start
+
+## Architecture Notes
+
+- Frontend SPA: React + Vite + TypeScript
+- Prediction engine: client-side in src/lib/mlEngine.ts
+- AI chat adapter: src/lib/ai.ts
+- Supabase client/auth/storage helpers: src/lib/supabase.ts
+- Production server and secure AI proxy: server.mjs
 
 ## Security Notes
 
-- `NVIDIA_API_KEY` is server-side only. It is never sent to the browser.
-- Chat proxy endpoint is rate-limited and validates payload shape.
-- Security headers are enforced by the Express server (CSP, HSTS, frame blocking, and MIME sniff prevention).
-- Service worker is opt-in only via `VITE_ENABLE_SERVICE_WORKER=true`.
-- If a key was previously committed, rotate it in the provider dashboard before deploying.
+- NVIDIA_API_KEY is server-side only and should never be committed.
+- Keep secrets in environment variables, not source files.
+- If a key was exposed previously, rotate it before deployment.
+- Service worker is opt-in via VITE_ENABLE_SERVICE_WORKER=true.

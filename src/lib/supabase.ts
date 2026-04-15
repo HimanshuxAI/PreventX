@@ -9,33 +9,54 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+if (!isSupabaseConfigured) {
+  console.warn('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(
+  supabaseUrl || 'https://example.invalid',
+  supabaseAnonKey || 'missing-anon-key'
+);
+
+function getConfigError(message = 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.') {
+  return { error: { message } } as any;
+}
 
 // ─── Auth Helpers ───────────────────────────────────────────────────────────────
 
 export async function signUp(email: string, password: string) {
+  if (!isSupabaseConfigured) return getConfigError();
   return supabase.auth.signUp({ email, password });
 }
 
 export async function signIn(email: string, password: string) {
+  if (!isSupabaseConfigured) return getConfigError();
   return supabase.auth.signInWithPassword({ email, password });
 }
 
 export async function signOut() {
+  if (!isSupabaseConfigured) return getConfigError();
   return supabase.auth.signOut();
 }
 
 export async function getCurrentUser() {
+  if (!isSupabaseConfigured) return null;
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
 
 export function onAuthStateChange(callback: (event: string, session: any) => void) {
+  if (!isSupabaseConfigured) {
+    return {
+      data: {
+        subscription: {
+          unsubscribe: () => {},
+        },
+      },
+    } as any;
+  }
   return supabase.auth.onAuthStateChange(callback);
 }
 
@@ -60,6 +81,7 @@ export interface SupabaseReport {
 }
 
 export async function saveReportToCloud(report: SupabaseReport) {
+  if (!isSupabaseConfigured) return getConfigError();
   const user = await getCurrentUser();
   if (!user) return { error: 'Not authenticated' };
 
@@ -70,6 +92,7 @@ export async function saveReportToCloud(report: SupabaseReport) {
 }
 
 export async function getCloudReports() {
+  if (!isSupabaseConfigured) return { data: [], error: 'Supabase not configured' };
   const user = await getCurrentUser();
   if (!user) return { data: [], error: 'Not authenticated' };
 
@@ -82,12 +105,14 @@ export async function getCloudReports() {
 }
 
 export async function deleteCloudReport(id: string) {
+  if (!isSupabaseConfigured) return getConfigError();
   return supabase.from('health_reports').delete().eq('id', id);
 }
 
 // ─── Storage Helpers ────────────────────────────────────────────────────────────
 
 export async function uploadMedicalImage(file: File, userId: string, type: 'fingernail' | 'eyelid'): Promise<{ url?: string; error?: any }> {
+  if (!isSupabaseConfigured) return getConfigError('Supabase storage is not configured.');
   try {
     const fileExt = file.name.split('.').pop() || 'jpg';
     const fileName = `${userId}/${type}-${Date.now()}.${fileExt}`;
