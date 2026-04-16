@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PreventX – Guided Onboarding</title>
+<style>
+/* ─── Reset & Base ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0f1117;
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+
+/* ─── Demo App Shell ────────────────────────────────────── */
+.app-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #1a1d2e; padding: 14px 28px; border-bottom: 1px solid #2a2d3e;
+}
+.app-nav .logo { font-size: 20px; font-weight: 700; color: #60a5fa; letter-spacing: -.3px; }
+.app-nav .nav-links { display: flex; gap: 22px; }
+.app-nav .nav-links a {
+  color: #94a3b8; text-decoration: none; font-size: 14px; font-weight: 500;
+  transition: color .2s;
+}
+.app-nav .nav-links a:hover { color: #e2e8f0; }
+#profile-btn {
+  background: #2563eb; color: #fff; border: none; padding: 8px 18px;
+  border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .2s;
+}
+#profile-btn:hover { background: #3b82f6; }
+
+.app-body { display: flex; min-height: calc(100vh - 55px); }
+
+.sidebar {
+  width: 220px; background: #141625; padding: 24px 16px;
+  border-right: 1px solid #2a2d3e; display: flex; flex-direction: column; gap: 6px;
+}
+.sidebar a {
+  color: #94a3b8; text-decoration: none; font-size: 14px; padding: 10px 14px;
+  border-radius: 8px; transition: all .2s; display: flex; align-items: center; gap: 10px;
+}
+.sidebar a:hover { background: #1e2035; color: #e2e8f0; }
+.sidebar a .icon { font-size: 16px; }
+
+.main-content { flex: 1; padding: 36px 40px; }
+.main-content h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+.main-content p.subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 36px; }
+.card {
+  background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 14px;
+  padding: 24px; transition: border-color .2s;
+}
+.card:hover { border-color: #3b4a6b; }
+.card h3 { font-size: 14px; color: #64748b; font-weight: 500; margin-bottom: 8px; }
+.card .value { font-size: 32px; font-weight: 700; }
+.card .value.blue { color: #60a5fa; }
+.card .value.green { color: #34d399; }
+.card .value.amber { color: #fbbf24; }
+
+#scan-btn {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #fff; border: none; padding: 14px 32px; border-radius: 12px;
+  font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+}
+#scan-btn:hover { opacity: .9; }
+
+#notif-btn {
+  background: none; border: 1px solid #2a2d3e; color: #94a3b8; padding: 8px 14px;
+  border-radius: 8px; font-size: 18px; cursor: pointer; transition: all .2s;
+  position: relative;
+}
+#notif-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+#notif-btn .badge {
+  position: absolute; top: -4px; right: -4px; width: 16px; height: 16px;
+  background: #ef4444; border-radius: 50%; font-size: 10px; display: flex;
+  align-items: center; justify-content: center; color: #fff; font-weight: 700;
+}
+
+.nav-right { display: flex; align-items: center; gap: 14px; }
+
+/* ─── Onboarding Overlay ────────────────────────────────── */
+.onboard-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  pointer-events: none; opacity: 0;
+  transition: opacity .35s ease;
+}
+.onboard-overlay.active { opacity: 1; pointer-events: auto; }
+
+/* Dark backdrop — sits behind highlight */
+.onboard-backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  background: transparent; pointer-events: auto;
+}
+
+/* Spotlight hole */
+.onboard-spotlight {
+  position: fixed; z-index: 10001;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.72);
+  transition: top .35s ease, left .35s ease, width .35s ease, height .35s ease, border-radius .35s ease;
+  pointer-events: none; /* clicks pass through hole to elevated target */
+}
+
+/* Tooltip bubble */
+.onboard-tooltip {
+  position: fixed; z-index: 10003;
+  background: #1e293b; border: 1px solid #334155;
+  border-radius: 14px; padding: 18px 22px;
+  max-width: 280px; min-width: 180px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  pointer-events: auto;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .3s ease .1s, transform .3s ease .1s;
+}
+.onboard-tooltip.show { opacity: 1; transform: translateY(0); }
+
+.onboard-tooltip .tip-text {
+  font-size: 14px; font-weight: 600; color: #e2e8f0;
+  line-height: 1.45; margin-bottom: 14px;
+}
+.onboard-tooltip .tip-footer {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.onboard-tooltip .tip-progress {
+  font-size: 11px; color: #64748b; font-weight: 500;
+}
+.onboard-tooltip .tip-skip {
+  background: none; border: none; color: #64748b; font-size: 12px;
+  cursor: pointer; font-weight: 500; text-decoration: underline;
+  transition: color .2s;
+}
+.onboard-tooltip .tip-skip:hover { color: #94a3b8; }
+
+/* Arrow for tooltip */
+.onboard-tooltip::before {
+  content: ''; position: absolute; width: 12px; height: 12px;
+  background: #1e293b; border: 1px solid #334155;
+  transform: rotate(45deg);
+}
+.onboard-tooltip.arrow-top::before    { top: -7px; left: 28px; border-right: none; border-bottom: none; }
+.onboard-tooltip.arrow-bottom::before { bottom: -7px; left: 28px; border-left: none; border-top: none; }
+.onboard-tooltip.arrow-left::before   { left: -7px; top: 20px; border-top: none; border-right: none; }
+.onboard-tooltip.arrow-right::before  { right: -7px; top: 20px; border-bottom: none; border-left: none; }
+
+/* Micro-feedback flash */
+.onboard-feedback {
+  position: fixed; z-index: 10005;
+  font-size: 18px; font-weight: 800; color: #34d399;
+  pointer-events: none; opacity: 0;
+  text-shadow: 0 0 12px rgba(52,211,153,.5);
+  animation: none;
+}
+.onboard-feedback.pop {
+  animation: feedbackPop .7s ease forwards;
+}
+@keyframes feedbackPop {
+  0%   { opacity: 0; transform: translateY(0) scale(.7); }
+  30%  { opacity: 1; transform: translateY(-10px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-36px) scale(.9); }
+}
+
+/* Mascot */
+.onboard-mascot {
+  position: fixed; bottom: 20px; right: 24px; z-index: 10004;
+  width: 90px; height: 90px; pointer-events: none;
+  opacity: 0; transition: opacity .4s ease;
+  animation: mascotBounce 2.4s ease-in-out infinite;
+}
+.onboard-mascot.show { opacity: 1; }
+.onboard-mascot img { width: 100%; height: 100%; object-fit: contain; }
+@keyframes mascotBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+/* Pulse ring on highlighted element */
+.onboard-pulse {
+  position: fixed; z-index: 10002; pointer-events: none;
+  border-radius: 12px; border: 2px solid rgba(96,165,250,.6);
+  animation: pulseRing 1.6s ease-in-out infinite;
+}
+@keyframes pulseRing {
+  0%   { opacity: .7; transform: scale(1); }
+  50%  { opacity: .2; transform: scale(1.06); }
+  100% { opacity: .7; transform: scale(1); }
+}
+
+/* When onboarding is active, lock the page */
+body.onboard-lock > *:not(.onboard-overlay):not(.onboard-mascot):not(.onboard-feedback) {
+  /* elements stay painted but we control clicks via z-index */
+}
+
+/* Elevated target class — applied to current step element */
+.onboard-target-active {
+  position: relative !important;
+  z-index: 10002 !important;
+  pointer-events: auto !important;
+}
+
+/* Mobile adjustments */
+@media (max-width: 700px) {
+  .sidebar { display: none; }
+  .main-content { padding: 20px 16px; }
+  .app-nav { padding: 12px 16px; }
+  .onboard-mascot { width: 64px; height: 64px; bottom: 12px; right: 12px; }
+  .onboard-tooltip { max-width: 240px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════ Demo App UI ═══════ -->
+<nav class="app-nav">
+  <div class="logo">PreventX</div>
+  <div class="nav-links">
+    <a href="#" id="nav-dashboard">Dashboard</a>
+    <a href="#" id="nav-reports">Reports</a>
+    <a href="#" id="nav-history">History</a>
+  </div>
+  <div class="nav-right">
+    <button id="notif-btn" aria-label="Notifications">🔔<span class="badge">3</span></button>
+    <button id="profile-btn">My Profile</button>
+  </div>
+</nav>
+
+<div class="app-body">
+  <aside class="sidebar">
+    <a href="#" id="side-home"><span class="icon">🏠</span> Home</a>
+    <a href="#" id="side-scan"><span class="icon">🔬</span> New Scan</a>
+    <a href="#" id="side-results"><span class="icon">📊</span> Results</a>
+    <a href="#" id="side-settings"><span class="icon">⚙️</span> Settings</a>
+  </aside>
+
+  <main class="main-content">
+    <h1>Welcome to PreventX</h1>
+    <p class="subtitle">AI-powered preventive health screening at your fingertips.</p>
+
+    <div class="cards">
+      <div class="card" id="card-scans">
+        <h3>Total Scans</h3>
+        <div class="value blue">0</div>
+      </div>
+      <div class="card" id="card-risk">
+        <h3>Risk Level</h3>
+        <div class="value green">Low</div>
+      </div>
+      <div class="card" id="card-alerts">
+        <h3>Active Alerts</h3>
+        <div class="value amber">3</div>
+      </div>
+    </div>
+
+    <button id="scan-btn">🩺 Start Health Scan</button>
+  </main>
+</div>
+
+<!-- ═══════ Onboarding DOM ═══════ -->
+<div class="onboard-overlay" id="onboard-overlay">
+  <div class="onboard-backdrop" id="onboard-backdrop"></div>
+  <div class="onboard-spotlight" id="onboard-spotlight"></div>
+  <div class="onboard-pulse" id="onboard-pulse"></div>
+  <div class="onboard-tooltip" id="onboard-tooltip">
+    <div class="tip-text" id="tip-text"></div>
+    <div class="tip-footer">
+      <span class="tip-progress" id="tip-progress"></span>
+      <button class="tip-skip" id="tip-skip">Skip</button>
+    </div>
+  </div>
+</div>
+<div class="onboard-mascot" id="onboard-mascot">
+  <img src="mascot.png" alt="Guide mascot" onerror="this.parentElement.innerHTML='🤖'">
+</div>
+<div class="onboard-feedback" id="onboard-feedback"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Forced Onboarding Overlay System
+   ═══════════════════════════════════════════════════════════ */
+
+const STORAGE_KEY = 'preventx_onboarding_done';
+const FEEDBACK_WORDS = ['Nice!', 'Great!', 'Got it!', 'Perfect!', '👍'];
+const SPOTLIGHT_PAD = 10; // px padding around target
+
+/* ─── Step Definitions ──────────────────────────────────── */
+const STEPS = [
+  { element: '#scan-btn',   text: 'Tap here to start a scan' },
+  { element: '#notif-btn',  text: 'Check your notifications' },
+  { element: '#card-alerts', text: 'Review active alerts' },
+  { element: '#side-results', text: 'View your results here' },
+  { element: '#profile-btn', text: 'Set up your profile' },
+];
+
+/* ─── DOM Refs ──────────────────────────────────────────── */
+const $overlay   = document.getElementById('onboard-overlay');
+const $backdrop  = document.getElementById('onboard-backdrop');
+const $spotlight = document.getElementById('onboard-spotlight');
+const $pulse     = document.getElementById('onboard-pulse');
+const $tooltip   = document.getElementById('onboard-tooltip');
+const $tipText   = document.getElementById('tip-text');
+const $tipProg   = document.getElementById('tip-progress');
+const $tipSkip   = document.getElementById('tip-skip');
+const $mascot    = document.getElementById('onboard-mascot');
+const $feedback  = document.getElementById('onboard-feedback');
+
+let currentStep = 0;
+let activeTarget = null;
+let isTransitioning = false;
+
+/* ─── Public API ────────────────────────────────────────── */
+
+function startTour() {
+  if (localStorage.getItem(STORAGE_KEY) === 'true') return;
+  currentStep = 0;
+  document.body.classList.add('onboard-lock');
+  $overlay.classList.add('active');
+  $mascot.classList.add('show');
+  showStep(currentStep);
+}
+
+function showStep(index) {
+  if (index >= STEPS.length) { endTour(); return; }
+  if (isTransitioning) return;
+
+  const step = STEPS[index];
+  const el = document.querySelector(step.element);
+
+  // Edge case: element not found → skip
+  if (!el) { currentStep++; showStep(currentStep); return; }
+
+  // Deactivate previous target
+  if (activeTarget) {
+    activeTarget.classList.remove('onboard-target-active');
+    activeTarget.removeEventListener('click', handleTargetClick);
+  }
+
+  activeTarget = el;
+  currentStep = index;
+
+  // Elevate target above overlay
+  el.classList.add('onboard-target-active');
+
+  // Position spotlight & tooltip
+  positionHighlight(el);
+
+  // Update text
+  $tipText.textContent = step.text;
+  $tipProg.textContent = `Step ${index + 1} / ${STEPS.length}`;
+
+  // Show tooltip with slight delay for transition
+  $tooltip.classList.remove('show');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      positionTooltip(el);
+      $tooltip.classList.add('show');
+    });
+  });
+
+  // Bind click
+  el.addEventListener('click', handleTargetClick, { once: true });
+}
+
+function endTour() {
+  isTransitioning = true;
+  if (activeTarget) {
+    activeTarget.classList.remove('onboard-target-active');
+    activeTarget.removeEventListener('click', handleTargetClick);
+    activeTarget = null;
+  }
+  $overlay.classList.remove('active');
+  $mascot.classList.remove('show');
+  $tooltip.classList.remove('show');
+  document.body.classList.remove('onboard-lock');
+  localStorage.setItem(STORAGE_KEY, 'true');
+  setTimeout(() => { isTransitioning = false; }, 400);
+}
+
+/* ─── Internal ──────────────────────────────────────────── */
+
+function handleTargetClick(e) {
+  if (isTransitioning) return;
+  e.stopPropagation();
+  isTransitioning = true;
+
+  showFeedback(e);
+
+  // Small delay so user sees feedback before transition
+  setTimeout(() => {
+    isTransitioning = false;
+    currentStep++;
+    showStep(currentStep);
+  }, 500);
+}
+
+function positionHighlight(el) {
+  const r = el.getBoundingClientRect();
+  const pad = SPOTLIGHT_PAD;
+
+  const top  = r.top - pad;
+  const left = r.left - pad;
+  const w    = r.width + pad * 2;
+  const h    = r.height + pad * 2;
+
+  Object.assign($spotlight.style, {
+    top: top + 'px', left: left + 'px', width: w + 'px', height: h + 'px',
+  });
+  Object.assign($pulse.style, {
+    top: top + 'px', left: left + 'px', width: w + 'px', height: h + 'px',
+  });
+}
+
+function positionTooltip(el) {
+  const r = el.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const pad = 16;
+
+  // Remove old arrow classes
+  $tooltip.className = 'onboard-tooltip show';
+
+  // Prefer placing below, then above, then right, then left
+  const tipRect = $tooltip.getBoundingClientRect();
+  const tw = tipRect.width || 260;
+  const th = tipRect.height || 100;
+
+  let top, left;
+
+  if (r.bottom + th + pad + SPOTLIGHT_PAD < vh) {
+    // Below
+    top  = r.bottom + SPOTLIGHT_PAD + pad;
+    left = r.left + r.width / 2 - tw / 2;
+    $tooltip.classList.add('arrow-top');
+  } else if (r.top - th - pad - SPOTLIGHT_PAD > 0) {
+    // Above
+    top  = r.top - SPOTLIGHT_PAD - pad - th;
+    left = r.left + r.width / 2 - tw / 2;
+    $tooltip.classList.add('arrow-bottom');
+  } else if (r.right + tw + pad + SPOTLIGHT_PAD < vw) {
+    // Right
+    top  = r.top + r.height / 2 - th / 2;
+    left = r.right + SPOTLIGHT_PAD + pad;
+    $tooltip.classList.add('arrow-left');
+  } else {
+    // Left
+    top  = r.top + r.height / 2 - th / 2;
+    left = r.left - SPOTLIGHT_PAD - pad - tw;
+    $tooltip.classList.add('arrow-right');
+  }
+
+  // Clamp to viewport
+  left = Math.max(12, Math.min(left, vw - tw - 12));
+  top  = Math.max(12, Math.min(top, vh - th - 12));
+
+  $tooltip.style.top  = top + 'px';
+  $tooltip.style.left = left + 'px';
+}
+
+function showFeedback(e) {
+  const word = FEEDBACK_WORDS[currentStep % FEEDBACK_WORDS.length];
+  $feedback.textContent = word;
+  $feedback.style.top  = (e.clientY - 20) + 'px';
+  $feedback.style.left = (e.clientX) + 'px';
+  $feedback.classList.remove('pop');
+  void $feedback.offsetWidth; // force reflow
+  $feedback.classList.add('pop');
+}
+
+/* ─── Reposition on resize/scroll ───────────────────────── */
+function reposition() {
+  if (!activeTarget || !$overlay.classList.contains('active')) return;
+  positionHighlight(activeTarget);
+  positionTooltip(activeTarget);
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(reposition, 80); });
+window.addEventListener('scroll', reposition, true);
+
+/* ─── Block clicks on backdrop ──────────────────────────── */
+$backdrop.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
+
+/* ─── Skip button ───────────────────────────────────────── */
+$tipSkip.addEventListener('click', (e) => { e.stopPropagation(); endTour(); });
+
+/* ─── Auto-start on load ────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  // Short delay so layout stabilizes
+  setTimeout(startTour, 600);
+});
+
+/* ─── Dev helper: reset onboarding ──────────────────────── */
+window.resetOnboarding = () => { localStorage.removeItem(STORAGE_KEY); location.reload(); };
+</script>
+</body>
+</html>

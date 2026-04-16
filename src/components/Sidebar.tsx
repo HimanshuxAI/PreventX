@@ -1,12 +1,12 @@
 import React from 'react';
-import { 
-  Home, 
-  Activity, 
-  MessageSquare, 
-  Stethoscope, 
-  ShieldCheck, 
-  LineChart, 
-  Globe2, 
+import {
+  Home,
+  Activity,
+  MessageSquare,
+  Stethoscope,
+  ShieldCheck,
+  LineChart,
+  Globe2,
   Settings,
   Heart,
   FileText
@@ -22,7 +22,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onPageChange, language }: SidebarProps) {
   const t = translations[language];
-  
+
   const menuItems = [
     { id: 'home', icon: Home, label: t.home },
     { id: 'predictor', icon: Activity, label: t.predictor },
@@ -49,8 +49,8 @@ export function Sidebar({ currentPage, onPageChange, language }: SidebarProps) {
             onClick={() => onPageChange(item.id as Page)}
             className={cn(
               "flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 group text-left",
-              currentPage === item.id 
-                ? "bg-teal-50 text-teal-600 shadow-sm" 
+              currentPage === item.id
+                ? "bg-teal-50 text-teal-600 shadow-sm"
                 : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
             )}
           >

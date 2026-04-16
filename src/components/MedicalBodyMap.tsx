@@ -86,20 +86,20 @@ export function MedicalBodyMap({ results }: MedicalBodyMapProps) {
 
       {/* Overlays */}
       <div className="absolute top-8 left-8 space-y-4">
-        <HealthLabel 
-          label="Cardiovascular" 
-          value={results?.hypertension.risk} 
-          color={getRiskColor(results?.hypertension.risk)} 
+        <HealthLabel
+          label="Cardiovascular"
+          value={results?.hypertension.risk}
+          color={getRiskColor(results?.hypertension.risk)}
         />
-        <HealthLabel 
-          label="Metabolic" 
-          value={results?.diabetes.risk} 
-          color={getRiskColor(results?.diabetes.risk)} 
+        <HealthLabel
+          label="Metabolic"
+          value={results?.diabetes.risk}
+          color={getRiskColor(results?.diabetes.risk)}
         />
-        <HealthLabel 
-          label="Hematologic" 
-          value={results?.anemia.risk} 
-          color={getRiskColor(results?.anemia.risk)} 
+        <HealthLabel
+          label="Hematologic"
+          value={results?.anemia.risk}
+          color={getRiskColor(results?.anemia.risk)}
         />
       </div>
     </div>

@@ -1,27 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Shield, 
-  Activity, 
-  Globe, 
-  Users, 
-  Mic, 
-  Play, 
-  Zap, 
-  Smartphone, 
-  FileText, 
-  LineChart as LineChartIcon, 
+import {
+  Shield,
+  Activity,
+  Globe,
+  Users,
+  Mic,
+  Play,
+  Zap,
+  Smartphone,
+  FileText,
+  LineChart as LineChartIcon,
   Sparkles,
   ArrowUpRight,
   TrendingUp,
   History
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   AreaChart,
   Area
@@ -94,7 +94,7 @@ export function Dashboard({ language, onPageChange, onStartPredictor }: Dashboar
             { label: 'Hypertension', value: latestResults ? `${latestResults.hypertension.risk}%` : '---', unit: 'Risk', icon: TrendingUp, color: 'from-rose-400 to-pink-400' },
             { label: 'Tests Done', value: reports.length.toString(), unit: 'Assessments', icon: History, color: 'from-blue-400 to-indigo-400' },
           ].map((stat, i) => (
-            <motion.div 
+            <motion.div
               key={i}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -116,7 +116,7 @@ export function Dashboard({ language, onPageChange, onStartPredictor }: Dashboar
 
         {/* Main Action */}
         <div className="relative mb-12 group">
-          <button 
+          <button
             onClick={onStartPredictor}
             className="w-full py-6 bg-slate-900 text-white rounded-[40px] font-bold text-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-6 shadow-2xl relative overflow-hidden"
           >
@@ -146,29 +146,29 @@ export function Dashboard({ language, onPageChange, onStartPredictor }: Dashboar
               ))}
             </div>
           </div>
-          
+
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={displayData}>
                 <defs>
                   <linearGradient id="gradientDM" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#FB923C" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#FB923C" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#FB923C" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#FB923C" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis 
-                  dataKey="date" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 600 }} 
+                <XAxis
+                  dataKey="date"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 600 }}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 600 }} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 600 }}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#fff', borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
                 />
                 <Area type="monotone" dataKey="Diabetes" stroke="#FB923C" strokeWidth={4} fill="url(#gradientDM)" />
@@ -217,13 +217,13 @@ export function Dashboard({ language, onPageChange, onStartPredictor }: Dashboar
               <h4 className="font-bold text-slate-900">AI Health Insight</h4>
             </div>
             <p className="text-sm text-slate-600 leading-relaxed italic">
-              {latestResults 
+              {latestResults
                 ? `Based on your ${latestResults.overallRisk}% risk profile, your primary focus should be on ${latestResults.diabetes.risk > latestResults.hypertension.risk ? 'blood sugar management' : 'cardiovascular health'}.`
                 : "Complete your first health scan to unlock personalized bio-digital insights."}
             </p>
           </div>
 
-          <button 
+          <button
             onClick={() => onPageChange('chatbot')}
             className="w-full py-5 bg-teal-600/10 text-teal-700 rounded-3xl font-bold flex items-center justify-center gap-3 hover:bg-teal-600 hover:text-white transition-all group"
           >
