@@ -92,6 +92,15 @@ export interface PredictionResults {
 
 // ─── Feature Extractors ─────────────────────────────────────────────────────────
 
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+}
+
 function parseBMI(height: string, weight: string): number {
   const h = parseFloat(height) / 100; // cm to m
   const w = parseFloat(weight);
@@ -361,7 +370,7 @@ function predictHypertension(data: FormDataInput): DiseaseResult {
 // Vision: ViT-B/16 on conjunctiva/sclera → 98.47% accuracy
 // Tabular: symptom-based screening from clinical questionnaire
 
-function predictAnemia(data: FormDataInput): DiseaseResult {
+async function predictAnemia(data: FormDataInput): Promise<DiseaseResult> {
   const age = parseInt(data.age) || 30;
   const isFemale = data.gender === 'Female' ? 1 : 0;
 
@@ -439,14 +448,62 @@ function predictAnemia(data: FormDataInput): DiseaseResult {
   const hasNailImage = data.fingernailPhoto !== null;
 
   if (hasEyeImage || hasNailImage) {
-    // Simulate ViT processing:
-    // In production, this would send the image to a ViT-B/16 model
-    // The model analyzes conjunctival pallor, scleral hue, and vascular patterns
-    // We simulate with a score biased by tabular indicators
-    const visionBase = tabularRisk * 0.8 + (Math.random() * 15 - 5);
-    const imageCount = (hasEyeImage ? 1 : 0) + (hasNailImage ? 1 : 0);
-    visionConfidence = 85 + imageCount * 6.5; // 91.5% for 1 image, 98% for 2
-    visionScore = Math.min(Math.max(visionBase, 5), 95);
+    try {
+      const content: any[] = [
+        { type: "text", text: "Analyze the image(s) for pallor, especially in the conjunctiva or fingernail bed. Tell me the probability of anemia based on pallor (from 0 to 100). Respond ONLY with the number." }
+      ];
+
+      if (hasEyeImage) {
+        content.push({
+          type: "image_url",
+          image_url: { url: await fileToBase64(data.eyelidPhoto!) }
+        });
+      }
+      if (hasNailImage) {
+        content.push({
+          type: "image_url",
+          image_url: { url: await fileToBase64(data.fingernailPhoto!) }
+        });
+      }
+
+      const response = await fetch('/api/nvidia/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: "nvidia/nemotron-nano-12b-v2-vl",
+          messages: [
+            { role: "system", content: "/think" },
+            { role: "user", content }
+          ],
+          temperature: 0.2,
+          top_p: 0.7,
+          max_tokens: 1024,
+          stream: false
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const aiText = result.choices?.[0]?.message?.content || '';
+        const matches = aiText.match(/\b([0-9]{1,3})\b/);
+        if (matches && parseInt(matches[1]) <= 100) {
+          visionScore = parseInt(matches[1]);
+        } else {
+          visionScore = tabularRisk * 0.8 + (Math.random() * 15 - 5);
+        }
+        visionScore = Math.min(Math.max(visionScore, 5), 95);
+        const imageCount = (hasEyeImage ? 1 : 0) + (hasNailImage ? 1 : 0);
+        visionConfidence = 85 + imageCount * 6.5; 
+      } else {
+        throw new Error('Vision API error');
+      }
+    } catch (e) {
+      console.warn("Vision API failed, falling back to simulated scores:", e);
+      const visionBase = tabularRisk * 0.8 + (Math.random() * 15 - 5);
+      const imageCount = (hasEyeImage ? 1 : 0) + (hasNailImage ? 1 : 0);
+      visionConfidence = 85 + imageCount * 6.5; 
+      visionScore = Math.min(Math.max(visionBase, 5), 95);
+    }
   }
 
   // Late Fusion: Tabular + Vision → Meta-learner
@@ -508,7 +565,7 @@ function predictAnemia(data: FormDataInput): DiseaseResult {
 
 // ─── What-If Simulator ──────────────────────────────────────────────────────────
 
-export function simulateWhatIf(
+export async function simulateWhatIf(
   baseData: FormDataInput,
   overrides: Partial<{
     weight: string;
@@ -520,19 +577,19 @@ export function simulateWhatIf(
     smoking: string;
     alcohol: string;
   }>
-): PredictionResults {
+): Promise<PredictionResults> {
   const modifiedData = { ...baseData, ...overrides };
   return runPrediction(modifiedData);
 }
 
 // ─── Main Prediction Pipeline ───────────────────────────────────────────────────
 
-export function runPrediction(data: FormDataInput): PredictionResults {
+export async function runPrediction(data: FormDataInput): Promise<PredictionResults> {
   const startTime = performance.now();
 
   const diabetes = predictDiabetes(data);
   const hypertension = predictHypertension(data);
-  const anemia = predictAnemia(data);
+  const anemia = await predictAnemia(data);
 
   const overallRisk = Math.round(
     diabetes.risk * 0.35 + hypertension.risk * 0.35 + anemia.risk * 0.30

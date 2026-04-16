@@ -5,6 +5,86 @@ import { cn } from '../lib/utils';
 import { streamChat, ChatMessage } from '../lib/ai';
 import { getReports, PredictionResults } from '../lib/mlEngine';
 
+/** Lightweight markdown renderer for chat messages */
+function renderMarkdown(text: string) {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+  let listKey = 0;
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(<ul key={`list-${listKey++}`} className="list-disc list-inside space-y-1 my-2">{listItems}</ul>);
+      listItems = [];
+    }
+  };
+
+  const inlineFormat = (str: string): React.ReactNode => {
+    // Bold: **text** or __text__
+    const parts = str.split(/(\*\*[^*]+\*\*|__[^_]+__)/g);
+    return parts.map((part, i) => {
+      if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+        return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
+      }
+      // Italic: *text* or _text_
+      const italicParts = part.split(/(\*[^*]+\*|_[^_]+_)/g);
+      return italicParts.map((ip, j) => {
+        if ((ip.startsWith('*') && ip.endsWith('*') && !ip.startsWith('**')) ||
+            (ip.startsWith('_') && ip.endsWith('_') && !ip.startsWith('__'))) {
+          return <em key={`${i}-${j}`}>{ip.slice(1, -1)}</em>;
+        }
+        return ip;
+      });
+    });
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    // Bullet points: - item, * item, • item
+    if (/^[-*•]\s+/.test(trimmed)) {
+      const content = trimmed.replace(/^[-*•]\s+/, '');
+      listItems.push(<li key={`li-${idx}`}>{inlineFormat(content)}</li>);
+      return;
+    }
+
+    // Numbered list: 1. item
+    if (/^\d+\.\s+/.test(trimmed)) {
+      flushList();
+      const content = trimmed.replace(/^\d+\.\s+/, '');
+      if (!listItems.length) {
+        // Start ordered feel with bullet
+        listItems.push(<li key={`li-${idx}`}>{inlineFormat(trimmed)}</li>);
+      } else {
+        listItems.push(<li key={`li-${idx}`}>{inlineFormat(content)}</li>);
+      }
+      return;
+    }
+
+    flushList();
+
+    // Empty line = paragraph break
+    if (!trimmed) {
+      elements.push(<div key={`br-${idx}`} className="h-2" />);
+      return;
+    }
+
+    // Heading: ### text
+    if (trimmed.startsWith('### ')) {
+      elements.push(<p key={idx} className="font-bold text-xs uppercase tracking-wider mt-3 mb-1 opacity-70">{trimmed.slice(4)}</p>);
+      return;
+    }
+
+    // Default paragraph
+    elements.push(<p key={idx}>{inlineFormat(trimmed)}</p>);
+  });
+
+  flushList();
+  return <div className="space-y-1">{elements}</div>;
+}
+
 interface Message {
   id: string;
   text: string;
@@ -128,7 +208,7 @@ export function ChatbotPage({ title, subtitle, examplePrompts, placeholder }: Ch
                   ? "bg-white text-slate-700 rounded-tl-none" 
                   : "bg-teal-600 text-white rounded-tr-none"
               )}>
-                {msg.text}
+                {msg.sender === 'bot' ? renderMarkdown(msg.text) : msg.text}
                 <p className={cn(
                   "text-[10px] mt-2 font-bold uppercase tracking-widest opacity-50",
                   msg.sender === 'user' ? "text-right" : ""

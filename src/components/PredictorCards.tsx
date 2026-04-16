@@ -220,10 +220,14 @@ export function DiseasePredictor({ onClose, language, initialDisease }: Predicto
         eyelidPhoto: formData.eyelidPhoto,
         otherCondition: formData.otherCondition || '',
       };
-      const predictionResults = runPrediction(mlInput);
-      setResults(predictionResults);
-      setIsCalculating(false);
-    }, 2500);
+      runPrediction(mlInput).then(predictionResults => {
+        setResults(predictionResults);
+        setIsCalculating(false);
+      }).catch(err => {
+        console.error("Prediction failed:", err);
+        setIsCalculating(false);
+      });
+    }, 1500);
   };
 
   const isMissing = (field: string) => {

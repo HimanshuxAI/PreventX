@@ -12,8 +12,8 @@ const CHAT_RATE_WINDOW_MS = 60_000;
 const CHAT_RATE_MAX_REQUESTS = 30;
 const CHAT_MAX_MESSAGES = 24;
 const CHAT_MAX_MESSAGE_LENGTH = 2000;
-const CHAT_MAX_TOKENS = 1024;
-const CHAT_MODEL = 'minimaxai/minimax-m2.7';
+const CHAT_MAX_TOKENS = 4096;
+const ALLOWED_MODELS = new Set(['google/gemma-2-2b-it', 'nvidia/nemotron-nano-12b-v2-vl', 'minimaxai/minimax-m2.7']);
 const ALLOWED_ROLES = new Set(['system', 'user', 'assistant']);
 
 app.disable('x-powered-by');
@@ -49,7 +49,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '256kb', type: ['application/json'] }));
+app.use(express.json({ limit: '10mb', type: ['application/json'] }));
 
 function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
@@ -108,18 +108,26 @@ function normalizeChatPayload(body) {
     }
 
     const role = typeof item.role === 'string' ? item.role : '';
-    const content = typeof item.content === 'string' ? item.content.trim() : '';
+    let content = item.content;
 
     if (!ALLOWED_ROLES.has(role)) {
       return { ok: false, error: `Invalid message role: ${role || 'unknown'}.` };
     }
 
-    if (!content) continue;
-    if (content.length > CHAT_MAX_MESSAGE_LENGTH) {
-      return {
-        ok: false,
-        error: `Message too long. Limit is ${CHAT_MAX_MESSAGE_LENGTH} characters.`,
-      };
+    if (typeof content === 'string') {
+      content = content.trim();
+      if (!content) continue;
+      if (content.length > CHAT_MAX_MESSAGE_LENGTH) {
+        return {
+          ok: false,
+          error: `Message too long. Limit is ${CHAT_MAX_MESSAGE_LENGTH} characters.`,
+        };
+      }
+    } else if (Array.isArray(content)) {
+      // Vision payload array support
+      if (content.length === 0) continue;
+    } else {
+      continue;
     }
 
     messages.push({ role, content });
@@ -129,10 +137,12 @@ function normalizeChatPayload(body) {
     return { ok: false, error: 'No valid message content provided.' };
   }
 
+  const finalModel = ALLOWED_MODELS.has(body.model) ? body.model : 'google/gemma-2-2b-it';
+
   return {
     ok: true,
     payload: {
-      model: CHAT_MODEL,
+      model: finalModel,
       messages,
       temperature: clampNumber(body.temperature, 0, 1, 0.7),
       top_p: clampNumber(body.top_p, 0, 1, 0.95),

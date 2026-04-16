@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Zap, ArrowDown, ArrowUp, Minus, RotateCcw } from 'lucide-react';
 import { RiskGauge, MiniRiskGauge } from './RiskGauge';
@@ -106,9 +106,25 @@ export function WhatIfSimulator({ baseResults, formData, language }: WhatIfSimul
     },
   ];
 
-  const projectedResults = useMemo(() => {
-    if (Object.keys(overrides).length === 0) return baseResults;
-    return simulateWhatIf(formData, overrides as any);
+  const [projectedResults, setProjectedResults] = useState<PredictionResults>(baseResults);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  useEffect(() => {
+    if (Object.keys(overrides).length === 0) {
+      setProjectedResults(baseResults);
+      return;
+    }
+    let isActive = true;
+    setIsSimulating(true);
+    simulateWhatIf(formData, overrides as any).then(res => {
+      if (isActive) {
+        setProjectedResults(res);
+        setIsSimulating(false);
+      }
+    }).catch(err => {
+      if (isActive) setIsSimulating(false);
+    });
+    return () => { isActive = false; };
   }, [overrides, formData, baseResults]);
 
   const hasChanges = Object.keys(overrides).length > 0;

@@ -29,18 +29,39 @@ export async function* streamChat(
   messages: ChatMessage[],
   latestResults?: PredictionResults | null
 ) {
-  const contextMessages: ChatMessage[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    ...(latestResults ? [{
-      role: 'system' as const,
-      content: `LATEST ASSESSMENT DATA:
-      - Diabetes Risk: ${latestResults.diabetes.risk}% (${latestResults.diabetes.severity})
-      - Hypertension Risk: ${latestResults.hypertension.risk}% (${latestResults.hypertension.severity})
-      - Anemia Risk: ${latestResults.anemia.risk}% (${latestResults.anemia.severity})
-      - Key Risk Factors: ${latestResults.diabetes.shapFeatures.map(f => f.name).join(', ')}`
-    }] : []),
-    ...messages
+  // google/gemma-2-2b-it does NOT support "system" role AND requires strict
+  // user/assistant/user/assistant alternation.
+  // Inject persona + assessment data as a leading "user" instruction message.
+  let systemBlock = SYSTEM_PROMPT;
+  if (latestResults) {
+    systemBlock += `\n\nLATEST ASSESSMENT DATA:
+- Diabetes Risk: ${latestResults.diabetes.risk}% (${latestResults.diabetes.severity})
+- Hypertension Risk: ${latestResults.hypertension.risk}% (${latestResults.hypertension.severity})
+- Anemia Risk: ${latestResults.anemia.risk}% (${latestResults.anemia.severity})
+- Key Risk Factors: ${latestResults.diabetes.shapFeatures.map(f => f.name).join(', ')}`;
+  }
+
+  // Filter out any system-role messages from the incoming history
+  const cleanHistory = messages.filter(m => m.role !== 'system');
+
+  // Build raw message list: instruction → ack → conversation history
+  const rawMessages: ChatMessage[] = [
+    { role: 'user', content: `[INSTRUCTIONS — follow these for the entire conversation]\n${systemBlock}` },
+    { role: 'assistant', content: 'Understood. I am AarogyaShield AI. I will follow these guidelines.' },
+    ...cleanHistory
   ];
+
+  // Enforce strict user/assistant alternation by merging consecutive same-role messages
+  const contextMessages: ChatMessage[] = [];
+  for (const msg of rawMessages) {
+    const last = contextMessages[contextMessages.length - 1];
+    if (last && last.role === msg.role) {
+      // Merge into previous message of same role
+      last.content += '\n' + msg.content;
+    } else {
+      contextMessages.push({ ...msg });
+    }
+  }
 
   try {
     // In development, Vite proxies this route. In production, Express handles it.
@@ -50,7 +71,7 @@ export async function* streamChat(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "minimaxai/minimax-m2.7",
+        model: "google/gemma-2-2b-it",
         messages: contextMessages,
         temperature: 0.7,
         top_p: 0.95,
