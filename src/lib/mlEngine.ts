@@ -217,7 +217,7 @@ function predictDiabetes(data: FormDataInput): DiseaseResult {
 
   // DNN model simulation (Steeper response curve to capture clinical thresholds)
   const dnnRaw = Object.values(features).reduce((sum, f) => sum + f.value * f.weight * 1.2, 0);
-  const dnnSigmoid = 1 / (1 + Math.exp(-((dnnRaw / total_abs_weight) * 8 - 4))); // Steeper slope: 8 instead of 6
+  const dnnSigmoid = 1 / (1 + Math.exp(-((dnnRaw / total_abs_weight) * 9 - 4.2))); // Steeper slope: 9 to improve borderline sensitivity
   const dnnRisk = Math.min(Math.max(dnnSigmoid * 100, 2), 98);
 
   // Random Forest simulation
@@ -265,20 +265,21 @@ function predictHypertension(data: FormDataInput): DiseaseResult {
   const bmi = parseBMI(data.height, data.weight);
 
   // Direct mapping to XGBoost feature importance from the reference repo
+  // Rebalanced: BMI alone shouldn't push >50% without HTN-specific markers
   const features: Record<string, { value: number; weight: number; label: string }> = {
     bmi: {
       value: bmi >= 35 ? 1 : bmi >= 30 ? 0.8 : bmi >= 25 ? 0.5 : bmi >= 20 ? 0.2 : 0.1,
-      weight: 0.37,
+      weight: 0.22,
       label: `BMI (${bmi.toFixed(1)})`
     },
     family_history: {
       value: boolScore(data.familyHypertension),
-      weight: 0.13,
+      weight: 0.18,
       label: 'Family history of hypertension'
     },
     smoking_status: {
       value: data.smoking === 'Yes, regularly' ? 1 : data.smoking === 'Occasionally' ? 0.5 : 0,
-      weight: 0.12,
+      weight: 0.14,
       label: `Smoking: ${data.smoking}`
     },
     stress_score: {
@@ -294,13 +295,13 @@ function predictHypertension(data: FormDataInput): DiseaseResult {
         if (sys >= 130) return 0.7;
         if (sys >= 120) return 0.3;
         return 0.1;
-      })() : symptomPresent(data.symptoms, 'headache') ? 0.6 : 0.2,
-      weight: 0.07,
+      })() : symptomPresent(data.symptoms, 'headache') ? 0.5 : 0.1,
+      weight: 0.10,
       label: data.homeBP ? `BP Reading: ${data.homeBP}` : 'Blood pressure history'
     },
     salt_intake: {
-      value: data.saltIntake === 'High' ? 1 : data.saltIntake === 'Moderate' ? 0.5 : 0.1,
-      weight: 0.06,
+      value: data.saltIntake === 'High' ? 1 : data.saltIntake === 'Moderate' ? 0.4 : 0.1,
+      weight: 0.08,
       label: `Salt intake: ${data.saltIntake}`
     },
     sleep_duration: {
@@ -310,7 +311,7 @@ function predictHypertension(data: FormDataInput): DiseaseResult {
     },
     exercise_level: {
       value: data.exerciseFrequency === 'Never' ? 1 : data.exerciseFrequency === 'Rarely' ? 0.6 : 0.1,
-      weight: 0.08, // Positive weight for 'bad' habits
+      weight: 0.06,
       label: `Exercise: ${data.exerciseFrequency}`
     },
     age_factor: {
@@ -320,10 +321,18 @@ function predictHypertension(data: FormDataInput): DiseaseResult {
     },
     alcohol: {
       value: data.alcohol === 'Frequently' ? 1 : data.alcohol === 'Occasionally' ? 0.4 : 0,
-      weight: 0.03,
+      weight: 0.04,
       label: `Alcohol: ${data.alcohol}`
     }
   };
+
+  // HTN-specific gate: at least one strong HTN marker must be present for high risk
+  const hasStrongHTNMarker = 
+    boolScore(data.familyHypertension) > 0.5 ||
+    data.smoking === 'Yes, regularly' ||
+    data.saltIntake === 'High' ||
+    (data.homeBP && parseInt(data.homeBP.split('/')[0]) >= 130) ||
+    data.existingConditions.includes('High blood pressure');
 
   let xgbScore = 0;
   let lgbmScore = 0;
@@ -337,7 +346,12 @@ function predictHypertension(data: FormDataInput): DiseaseResult {
   const xgbRisk = Math.min(Math.max((xgbScore / totalW) * 100, 2), 97);
   const lgbmRisk = Math.min(Math.max((lgbmScore / totalW) * 100 + 2, 2), 97);
   const rfRisk = Math.min(Math.max(xgbRisk * 0.97 + Math.random() * 2, 2), 97);
-  const fusedScore = xgbRisk * 0.50 + lgbmRisk * 0.30 + rfRisk * 0.20;
+  let fusedScore = xgbRisk * 0.50 + lgbmRisk * 0.30 + rfRisk * 0.20;
+
+  // Apply HTN gate: cap at 45% if no strong HTN-specific markers are present
+  if (!hasStrongHTNMarker && fusedScore > 45) {
+    fusedScore = 35 + (fusedScore - 45) * 0.3; // Diminish score above 45 without HTN markers
+  }
   const risk = Math.round(Math.min(Math.max(fusedScore, 2), 97));
 
   const shapFeatures: SHAPFeature[] = Object.entries(features)
